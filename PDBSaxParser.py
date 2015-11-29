@@ -3,77 +3,55 @@
 
 import re
 import PDBUtils
+import PDBWikiBracketsTagParser
 import xml.sax
 
 TAG_TITLE = 'title'
 TAG_TEXT = 'text'
 
+CODE_NO_HEADER_FOUND = -1
 
-# This class is responsible for parsing the lines of text located
-# between the tag "<text>...</text>" of the wiktionary xml dump.
-class TextTagLineParser:
-   def parseLine(self, line):
-      lng = self.searchLangageSection(line)
-      phonetic = self.searchPhonetic(line)
-            
-      return lng, phonetic
-      
-   # The langage section in wiktionary is a ruban that indicates the langage of the word.
-   # Eg. for https://fr.wiktionary.org/wiki/ok there are several langage section
-   # such as 'Bimin', 'Espéranto', 'Gagaouze', 'Iwam', 'Muyu du Nord', 'Muyu du Sud' etc.
-   def searchLangageSection(self, line):
-      langage = ''
-      search_res = re.search('==([ ]*?){{langue\\|(.*?)}}([ ]*?)==', line)
-      if search_res:
-          langage = search_res.group(2)
-      return langage
+HEADER_LEVEL_LANGAGE_SECTION = 2
+HEADER_LEVEL_WORD_TYPE_SECTION = 3
+
+# This class is responsible for extracting tags contained
+# in the wikicode of a wiktionary page.
+class WikicodeTagExtractor:
+   # Parses the line and returns:
+   #  -the header level, if any. (wikitag '=== header ===')
+   #  -any bracket tag (wikitag '{{something}}')
+   @staticmethod
+   def parseLine(line, just_after_word_type_section):
+      header_level = WikicodeTagExtractor.extractWikiHeaderTagLevel(line)
+      brackets_tag = WikicodeTagExtractor.extractWikiBracketsTag(line)
+      return header_level, brackets_tag
    
-   #
-   # Returns the phonetic transcriptions found in the current line.
-   #
-   # Phonetic transcriptions can be found anywhere in the wikicode.
-   # Sometimes a paragraph contains a phnoetic transcription but it's 
-   # just a degretion talking about the way the word was pronounced in old times.
-   # We don't need these obsolete transcriptions, so we need a filter them.
-   # The easiest way is to only extract the transcriptions that we know
-   # correspond to current pronouciation.
-   # This is way we are only interested in the transcriptions located in 2 specific places:
-   #  -the transcriptions in the phonetic table:
-   #     Eg. for https://fr.wiktionary.org/wiki/affluent
-   #     The following table is the phonetic table on the page for 'affluent':
-   #     +----------+------------+------------+
-   #     |          | Singulier  | Pluriel    |
-   #     +----------+------------+------------+
-   #     | Masculin | affluent   | affluents  |
-   #     |          | \a.fly.ɑ̃\  | \a.fly.ɑ̃\  |
-   #     +----------+------------+------------+
-   #     |Féminin   | affluente  | affluentes |
-   #     |          | \a.fly.ɑ̃t\ | \a.fly.ɑ̃t\ |
-   #     +----------+------------+------------+
-   #     These transcriptions are accurate and will be extracted by the function.
-   #     NOTE: this table is not available on all pages.
-   #  -the transcription located immediatly under the "word type" section are also accurate.
-   #     Eg. for https://fr.wiktionary.org/wiki/affluent
-   #     Since the word 'affluent' is an homograph, there are several 'word type' sections,
-   #     and under each section there is a phonetic transcription of the word.
-   #        Eg. for the adjective form of 'affluent', here the section and the transcription lines:
-   #        |Adjectif [modifier | modifier le wikicode]
-   #        |affluent \a.fly.ɑ̃\
-   #     NOTE: this transcription will be extraced only when no phonetic table is available
-   #           (since that transcription is always containted in the table, when there is one).   
-   def searchPhonetic(self, line):
-      section_phonetic = self.searchPhoneticUnderWordTypeSection(line)
-      return section_phonetic
-      
-      
-   def searchPhoneticUnderWordTypeSection(self, line):
-      phonetic = ''
-      #phonetic_search = re.search('{{pron\\|(.*?)\\|'+PDBUtils.WikiLang.native+'}}', line)
-      # Extract the phonetic that is placed immedialty under the section title.
-      search_res = re.search("'''(.*?)''' {{pron\\|(.*?)\\|"+PDBUtils.WikiLang.active+"}}", line)
+   # Returns the level of the header contained in the line (if any), 
+   # or returns CODE_NO_HEADER_FOUND otherwise.
+   # NOTE: the headers are defined using the '=' sign.
+   #       The number of '=' defines the header level (<H1>, <H2>, <H3> etc)
+   # Eg: '== section_name =='    --> <H1> 
+   #     '=== section_name ==='  --> <H2> 
+   #      etc.
+   # More details here: https://en.wikipedia.org/wiki/Help:Wiki_markup#Sections
+   @staticmethod
+   def extractWikiHeaderTagLevel(line):
+      section_level = CODE_NO_HEADER_FOUND
+      search_res = re.search('([=]+)(.*?)([=]+)', line)
       if search_res:
-         phonetic = search_res.group(2)
-      return phonetic
+         opening_tag = search_res.group(1)
+         section_level = len(opening_tag)
+      return section_level
+      
+   # Retuns any expression of type "{{something}}" (=wiki brackets tag).
+   @staticmethod
+   def extractWikiBracketsTag(line):
+      wiki_tag = ''
+      search_res = re.search('{{(.+?)}}', line)
+      if search_res:
+         wiki_tag = search_res.group(0)
+      return wiki_tag
+      
 
 
 class DictionaryWritter:
@@ -100,7 +78,8 @@ class WikicodeParser:
       self.inside_tag_text = False
       self.current_section_lng = ''
       self.found_phonetics = []
-      self.text_tag_line_parser = TextTagLineParser()
+      self.text_tag_line_parser = WikicodeTagExtractor()
+      self.just_after_word_type_section = False
    
    def tagTitleOpened(self):
       self.inside_tag_title = True
@@ -131,10 +110,16 @@ class WikicodeParser:
          self.dict_writter.appendNewWord(word)
          print "Word: '"+word+"'"   
       elif self.inside_tag_text:
-         lng, phonetic = self.text_tag_line_parser.parseLine(line)
+         #lng, phonetic, self.just_after_word_type_section = self.text_tag_line_parser.parseLine(line, self.just_after_word_type_section)
+         header_level, brackets_tag = self.text_tag_line_parser.parseLine(line, self.just_after_word_type_section)
+         is_word_type_section = WikiBracketsTagParser.isWordTypeSection(brackets_tag)
+         # if the line is something like this "=== {{S|adverbe|fr}} ==="
+         if header_level==HEADER_LEVEL_LANGAGE_SECTION and is_word_type_section:
+            
          
+         lng =''
          if lng and lng != self.current_section_lng:
-            print 'Lng:', lng
+            #print 'Lng:', lng
             self.current_section_lng = lng
          
    
