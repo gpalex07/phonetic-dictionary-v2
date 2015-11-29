@@ -112,9 +112,11 @@ class WikicodeParser:
       elif self.inside_tag_text:
          #lng, phonetic, self.just_after_word_type_section = self.text_tag_line_parser.parseLine(line, self.just_after_word_type_section)
          header_level, brackets_tag = self.text_tag_line_parser.parseLine(line, self.just_after_word_type_section)
-         is_word_type_section = WikiBracketsTagParser.isWordTypeSection(brackets_tag)
+         
+         if brackets_tag:
+            is_word_type_section = PDBWikiBracketsTagParser.WikiBracketsTagParser.isWordTypeSection(brackets_tag)
          # if the line is something like this "=== {{S|adverbe|fr}} ==="
-         if header_level==HEADER_LEVEL_LANGAGE_SECTION and is_word_type_section:
+         #if header_level==HEADER_LEVEL_LANGAGE_SECTION and is_word_type_section:
             
          
          lng =''
