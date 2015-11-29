@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*- 
 
 import re
-import Utils
+import PDBUtils
 import xml.sax
 
 TAG_TITLE = 'title'
@@ -68,9 +68,9 @@ class TextTagLineParser:
       
    def searchPhoneticUnderWordTypeSection(self, line):
       phonetic = ''
-      #phonetic_search = re.search('{{pron\\|(.*?)\\|'+Utils.WikiLang.native+'}}', line)
+      #phonetic_search = re.search('{{pron\\|(.*?)\\|'+PDBUtils.WikiLang.native+'}}', line)
       # Extract the phonetic that is placed immedialty under the section title.
-      search_res = re.search("'''(.*?)''' {{pron\\|(.*?)\\|"+Utils.WikiLang.active+"}}", line)
+      search_res = re.search("'''(.*?)''' {{pron\\|(.*?)\\|"+PDBUtils.WikiLang.active+"}}", line)
       if search_res:
          phonetic = search_res.group(2)
       return phonetic
@@ -106,7 +106,7 @@ class WikicodeParser:
       self.inside_tag_title = True
       # By default the langage is the active one 
       # (except if the langage is explicitly specified by a langage section)
-      self.current_section_lng = Utils.WikiLang.active
+      self.current_section_lng = PDBUtils.WikiLang.active
       # Clear the phonetic results of the previous word.
       found_phonetics = []
    def tagTitleClosed(self):

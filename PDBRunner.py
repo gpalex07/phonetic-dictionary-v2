@@ -1,14 +1,14 @@
 import PDBUtils
-import PhoneticTableParser
-import XMLSaxParser
+import PDBPhoneticTableParser
+import PDBSaxParser
 import xml.sax
 
 reload(PDBUtils)
-reload(PhoneticTableParser)
-reload(XMLSaxParser)
+reload(PDBPhoneticTableParser)
+reload(PDBSaxParser)
 
 #filename = 'frwiktionary-20151102-pages-meta-current.xml'
-filename = 'test_wikicode.xml'
+filename = 'test/test_wikicode.xml'
 
 
    
@@ -27,8 +27,8 @@ def searchAccordTemplate(line):
 
                
 parser = xml.sax.make_parser()
-dictionary_writter = XMLSaxParser.DictionaryWritter(dict_filename)
-wikicode_parser = XMLSaxParser.WikicodeParser(dictionary_writter)
-sax_handler = XMLSaxParser.SAXHandler(wikicode_parser)
+dictionary_writter = PDBSaxParser.DictionaryWritter(dict_filename)
+wikicode_parser = PDBSaxParser.WikicodeParser(dictionary_writter)
+sax_handler = PDBSaxParser.SAXHandler(wikicode_parser)
 parser.setContentHandler(sax_handler)
 parser.parse(open(filename, "r"))
